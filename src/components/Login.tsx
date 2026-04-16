@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { motion } from "motion/react";
+import { motion } from "framer-motion"; // Note: changed from motion/react to framer-motion (standard)
 import {
   Leaf,
   Mail,
@@ -18,7 +18,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [displayName, setDisplayName] = useState(""); // This is 'name' in backend
   const [role, setRole] = useState<"admin" | "user">("user");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,16 +29,23 @@ export default function Login({ onLogin }: LoginProps) {
     setError("");
 
     try {
-      const endpoint = isRegister ? "/api/auth/register" : "/api/auth/login";
+      // 1. Corrected endpoints to match the backend /api prefix
+      const endpoint = isRegister ? "/api/register" : "/api/login";
+
+      // 2. Map 'displayName' state to the 'name' field the backend expects
       const body = isRegister
-        ? { email, password, role, displayName }
+        ? { name: displayName, email, password, role }
         : { email, password };
 
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}${endpoint}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include", // Important for cookies (JWT in HttpOnly cookie)
+          body: JSON.stringify(body),
+        },
+      );
 
       const data = await response.json();
 
@@ -49,9 +56,14 @@ export default function Login({ onLogin }: LoginProps) {
       if (isRegister) {
         setIsRegister(false);
         setError("Registration successful! Please login.");
+        // Clear name field after successful registration
+        setDisplayName("");
       } else {
+        // 3. Store the JWT token and User object
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
+
+        // Trigger the parent's login state update
         onLogin(data.user);
       }
     } catch (err: any) {
@@ -69,7 +81,7 @@ export default function Login({ onLogin }: LoginProps) {
         className="max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 bg-primary rounded-2xl mb-4 shadow-lg shadow-primary/20">
+          <div className="inline-flex items-center justify-center p-3 bg-green-600 rounded-2xl mb-4 shadow-lg shadow-green-600/20">
             <Leaf className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
@@ -95,12 +107,14 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
           )}
 
+          {/* Role Selection */}
           <div className="flex bg-slate-100 p-1 rounded-xl mb-8">
             <button
+              type="button"
               onClick={() => setRole("user")}
               className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${
                 role === "user"
-                  ? "bg-white text-primary shadow-sm"
+                  ? "bg-white text-green-600 shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -108,10 +122,11 @@ export default function Login({ onLogin }: LoginProps) {
               User
             </button>
             <button
+              type="button"
               onClick={() => setRole("admin")}
               className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all ${
                 role === "admin"
-                  ? "bg-white text-primary shadow-sm"
+                  ? "bg-white text-green-600 shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -132,7 +147,7 @@ export default function Login({ onLogin }: LoginProps) {
                     type="text"
                     required
                     placeholder="Enter your full name"
-                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-600 transition-all"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                   />
@@ -150,7 +165,7 @@ export default function Login({ onLogin }: LoginProps) {
                   type="email"
                   required
                   placeholder="name@company.com"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-600 transition-all"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
@@ -167,40 +182,23 @@ export default function Login({ onLogin }: LoginProps) {
                   type="password"
                   required
                   placeholder="••••••••"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-600 transition-all"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
             </div>
 
-            {!isRegister && (
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                  <span className="text-slate-600">Remember me</span>
-                </label>
-                <a href="#" className="text-primary font-bold hover:underline">
-                  Forgot password?
-                </a>
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-primary text-white py-4 rounded-2xl font-bold hover:bg-opacity-90 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-70"
+              className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2 disabled:opacity-70"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  {isRegister
-                    ? "Create Account"
-                    : `Sign In as ${role.charAt(0).toUpperCase() + role.slice(1)}`}
+                  {isRegister ? "Create Account" : "Sign In"}
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -213,18 +211,18 @@ export default function Login({ onLogin }: LoginProps) {
                 ? "Already have an account?"
                 : "Don't have an account?"}
               <button
-                onClick={() => setIsRegister(!isRegister)}
-                className="ml-1 text-primary font-bold hover:underline"
+                type="button"
+                onClick={() => {
+                  setIsRegister(!isRegister);
+                  setError("");
+                }}
+                className="ml-1 text-green-600 font-bold hover:underline"
               >
-                {isRegister ? "Sign In" : "Request Access"}
+                {isRegister ? "Sign In" : "Sign Up"}
               </button>
             </p>
           </div>
         </div>
-
-        <p className="text-center text-slate-400 text-xs mt-8">
-          © 2026 AgriMart Solutions. All rights reserved.
-        </p>
       </motion.div>
     </div>
   );

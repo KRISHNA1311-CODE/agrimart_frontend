@@ -34,12 +34,18 @@ export const handlePayRazorpay = async (
       );
     }
 
-    // 1. Create Order on Backend
-    const response = await fetch("http://localhost:8000/create-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount }),
-    });
+    // 1. Create Order on Backend (Protected)
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/create-order`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ amount }),
+      },
+    );
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -51,24 +57,28 @@ export const handlePayRazorpay = async (
     // 2. Configure Razorpay Options
     const options = {
       key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-      amount: order.amount, // Amount returned from backend (in paise)
+      amount: order.amount,
       currency: order.currency || "INR",
       name: "AgriMart",
       description: "Quality Agriculture Products",
       order_id: order.id,
       prefill: {
-        name: user?.displayName || "",
+        // Changed to .name to match User model
+        name: user?.name || "",
         email: user?.email || "",
       },
-      theme: { color: "#10b981" },
-      // The handler is called after successful authorization
+      theme: { color: "#16a34a" }, // Matched emerald-600 green
       handler: async (paymentResponse: any) => {
         try {
+          // 3. Verify Payment on Backend (Protected)
           const verifyRes = await fetch(
-            "http://localhost:8000/verify-payment",
+            `${import.meta.env.VITE_API_URL}/verify-payment`,
             {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "include",
               body: JSON.stringify({
                 razorpay_payment_id: paymentResponse.razorpay_payment_id,
                 razorpay_order_id: paymentResponse.razorpay_order_id,
@@ -77,11 +87,12 @@ export const handlePayRazorpay = async (
             },
           );
 
-          if (verifyRes.ok) {
+          const verificationData = await verifyRes.json();
+
+          if (verifyRes.ok && verificationData.success) {
             onPaymentSuccess(paymentResponse.razorpay_payment_id);
           } else {
-            const errorMsg = await verifyRes.json();
-            onError(errorMsg.error || "Payment verification failed");
+            onError(verificationData.error || "Payment verification failed");
           }
         } catch (error) {
           onError("Network error during verification");
@@ -96,9 +107,7 @@ export const handlePayRazorpay = async (
 
     const rzp = new (window as any).Razorpay(options);
 
-    // Handle payment failures (e.g., insufficient funds)
     rzp.on("payment.failed", (response: any) => {
-      console.error("Payment Failed Context:", response.error);
       onError(response.error.description || "Payment failed at gateway");
     });
 
