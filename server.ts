@@ -30,9 +30,11 @@ let isConnected = false;
 
 async function connectToDatabase() {
   if (isConnected) return;
-  
+
   if (!MONGODB_URI) {
-    console.warn("MONGODB_URI is not defined. Database features will be unavailable.");
+    console.warn(
+      "MONGODB_URI is not defined. Database features will be unavailable.",
+    );
     return;
   }
 
@@ -64,7 +66,9 @@ const getRazorpay = () => {
     if (!keyId || !keySecret) {
       throw new Error("RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is not defined");
     }
-    console.log(`Initializing Razorpay with Key ID starting with: ${keyId.substring(0, 8)}...`);
+    console.log(
+      `Initializing Razorpay with Key ID starting with: ${keyId.substring(0, 8)}...`,
+    );
     razorpay = new Razorpay({
       key_id: keyId,
       key_secret: keySecret,
@@ -78,27 +82,47 @@ app.post("/api/auth/register", async (req, res) => {
   try {
     await connectToDatabase();
     if (!isConnected) {
-      return res.status(503).json({ error: "Database connection not available. Please configure MONGODB_URI in settings." });
+      return res
+        .status(503)
+        .json({
+          error:
+            "Database connection not available. Please configure MONGODB_URI in settings.",
+        });
     }
     const { email, password, role, displayName } = req.body;
-    
+
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
-    
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ error: "This email is already registered. Please use a different email or sign in." });
+      return res
+        .status(400)
+        .json({
+          error:
+            "This email is already registered. Please use a different email or sign in.",
+        });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ email, password: hashedPassword, role, displayName });
+    const user = new User({
+      email,
+      password: hashedPassword,
+      role,
+      displayName,
+    });
     await user.save();
     res.status(201).json({ message: "User created" });
   } catch (error: any) {
     if (error.code === 11000) {
-      return res.status(400).json({ error: "This email is already registered. Please use a different email or sign in." });
+      return res
+        .status(400)
+        .json({
+          error:
+            "This email is already registered. Please use a different email or sign in.",
+        });
     }
     res.status(400).json({ error: error.message });
   }
@@ -108,7 +132,12 @@ app.post("/api/auth/login", async (req, res) => {
   try {
     await connectToDatabase();
     if (!isConnected) {
-      return res.status(503).json({ error: "Database connection not available. Please configure MONGODB_URI in settings." });
+      return res
+        .status(503)
+        .json({
+          error:
+            "Database connection not available. Please configure MONGODB_URI in settings.",
+        });
     }
     const { email, password } = req.body;
 
@@ -120,15 +149,17 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: "1d" });
-    res.json({ 
-      token, 
-      user: { 
-        uid: user._id, 
-        email: user.email, 
-        role: user.role, 
-        displayName: user.displayName 
-      } 
+    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
+      expiresIn: "1d",
+    });
+    res.json({
+      token,
+      user: {
+        uid: user._id,
+        email: user.email,
+        role: user.role,
+        displayName: user.displayName,
+      },
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -138,7 +169,7 @@ app.post("/api/auth/login", async (req, res) => {
 app.post("/api/razorpay/create-order", async (req, res) => {
   try {
     const { amount, currency = "INR" } = req.body;
-    
+
     if (!amount) {
       return res.status(400).json({ error: "Amount is required" });
     }
@@ -154,27 +185,41 @@ app.post("/api/razorpay/create-order", async (req, res) => {
     res.json(order);
   } catch (error: any) {
     console.error("Razorpay error:", JSON.stringify(error, null, 2));
-    
+
     // Handle Razorpay authentication errors specifically
     const errorCode = error.code || error.error?.code;
     const errorDesc = error.description || error.error?.description;
 
-    if (errorCode === 'BAD_REQUEST_ERROR' && errorDesc?.includes('Authentication failed')) {
-      return res.status(401).json({ 
-        error: "Razorpay authentication failed. Troubleshooting steps:\n1. Check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in Settings > Secrets.\n2. Ensure Key ID starts with 'rzp_test_' for test mode or 'rzp_live_' for live mode.\n3. Verify you haven't swapped the Secret and the ID.\n4. Ensure both Key and Secret belong to the same environment (Test vs Live)." 
+    if (
+      errorCode === "BAD_REQUEST_ERROR" &&
+      errorDesc?.includes("Authentication failed")
+    ) {
+      return res.status(401).json({
+        error:
+          "Razorpay authentication failed. Troubleshooting steps:\n1. Check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in Settings > Secrets.\n2. Ensure Key ID starts with 'rzp_test_' for test mode or 'rzp_live_' for live mode.\n3. Verify you haven't swapped the Secret and the ID.\n4. Ensure both Key and Secret belong to the same environment (Test vs Live).",
       });
     }
-    
-    res.status(500).json({ error: error.message || error.error?.description || "Failed to create Razorpay order" });
+
+    res
+      .status(500)
+      .json({
+        error:
+          error.message ||
+          error.error?.description ||
+          "Failed to create Razorpay order",
+      });
   }
 });
 
 app.post("/api/razorpay/verify-payment", async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-    
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
+      req.body;
+
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return res.status(400).json({ error: "Missing required payment details" });
+      return res
+        .status(400)
+        .json({ error: "Missing required payment details" });
     }
 
     const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
@@ -202,15 +247,20 @@ app.post("/api/razorpay/verify-payment", async (req, res) => {
 app.post("/api/notifications/telegram", async (req, res) => {
   try {
     const { message } = req.body;
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
+    const botToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+    const chatId = import.meta.env.VITE_TELEGRAM_CHAT_ID;
 
     if (!botToken || !chatId) {
-      console.warn("Telegram configuration is missing (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID). Telegram notification logged to console.");
+      console.warn(
+        "Telegram configuration is missing (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID). Telegram notification logged to console.",
+      );
       console.log("--- MOCK TELEGRAM NOTIFICATION ---");
       console.log(`Message: ${message}`);
       console.log("----------------------------------");
-      return res.json({ status: "mock_sent", message: "Telegram message logged to console (Bot not configured)" });
+      return res.json({
+        status: "mock_sent",
+        message: "Telegram message logged to console (Bot not configured)",
+      });
     }
 
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -238,7 +288,9 @@ app.post("/api/notifications/telegram", async (req, res) => {
           res.json({ status: "ok", message: "Telegram message sent" });
         } else {
           console.error("Telegram API error:", responseBody);
-          res.status(500).json({ error: "Telegram API error", details: responseBody });
+          res
+            .status(500)
+            .json({ error: "Telegram API error", details: responseBody });
         }
       });
     });
